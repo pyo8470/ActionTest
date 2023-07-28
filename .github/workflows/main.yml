@@ -1,13 +1,19 @@
-#위 내용은 지속적 통합을 위한 스크립트입니다.
-#지속적 통합을 위한 스크립트 아래에 작성합니다.
+# 위 내용은 지속적 통합을 위한 스크립트입니다.
+# 지속적 통합을 위한 스크립트 아래에 작성합니다.
+
+# AWS 자격증명 구성
 - name: Configure AWS credentials
   uses: aws-actions/configure-aws-credentials@v1
   with:
     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     aws-region: ap-northeast-2
+
+# AWS Systems Manager 세션 시작
 - name: Start Session Manager session
-  run: aws ssm start-session --target {인스턴스 id 값}
+  run: aws ssm start-session --target i-031b75db223afa06e
+
+# 서버에 배포
 - name: Deploy to Server
   env:
     AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
@@ -15,15 +21,19 @@
     AWS_REGION: ap-northeast-2
   run: |
     aws ssm send-command \
-      --instance-ids {인스턴스 id 값} \
+      --instance-ids i-031b75db223afa06e \
       --document-name "AWS-RunShellScript" \
       --parameters "commands=[
+        # 기존 서버가 실행 중인지 확인하고, 실행 중이면 중지하고 제거합니다.
         'if sudo docker ps -a --format \\'{{.Names}}\\' | grep -q \'^server$\\'; then',
         '  sudo docker stop server',
         '  sudo docker rm server',
         'fi',
-        'sudo docker pull {도커 유저네임}/spring-cicd:${GITHUB_SHA::7}',
-        'sudo docker tag {도커 유저네임}/spring-cicd:${GITHUB_SHA::7} spring-cicd',
+        # 새로운 도커 이미지를 가져옵니다. {도커 유저네임}은 실제 유저네임으로 대체되어야 합니다.
+        'sudo docker pull rkswlska789/spring-cicd:${GITHUB_SHA::7}',
+        # 가져온 이미지를 spring-cicd로 태그합니다.
+        'sudo docker tag rkswlska789/spring-cicd:${GITHUB_SHA::7} spring-cicd',
+        # 새로운 컨테이너를 실행합니다.
         'sudo docker run -d --name server -p 8080:8080 spring-cicd'
       ]" \
       --output text
